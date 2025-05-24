@@ -50,10 +50,5 @@ exports.handler = async (event) => {
   });
 
   // 7) Redirect to your Thank You page
-  return {
-    statusCode: 302,
-    headers: {
-      Location: "https://www.brylliantsolutions.com/free-fix-thank-you"
-    }
-  };
+  return { statusCode: 200, body: "OK" };
 };
