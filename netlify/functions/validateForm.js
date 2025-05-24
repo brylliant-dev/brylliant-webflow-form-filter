@@ -3,16 +3,15 @@
 const blocked       = require("./blocked-domains");
 const { resolveMx } = require("dns").promises;
 
-const FORM_ID    = process.env.WEBFLOW_FORM_ID;
-const API_TOKEN  = process.env.WEBFLOW_API_TOKEN;
-const RC_SECRET  = process.env.RECAPTCHA_SECRET_KEY;
+const FORM_ID   = process.env.WEBFLOW_FORM_ID;
+const API_TOKEN = process.env.WEBFLOW_API_TOKEN;
 
-if (!FORM_ID || !API_TOKEN || !RC_SECRET) {
-  throw new Error("Missing one of WEBFLOW_FORM_ID, WEBFLOW_API_TOKEN or RECAPTCHA_SECRET_KEY");
+if (!FORM_ID || !API_TOKEN) {
+  throw new Error("Missing WEBFLOW_FORM_ID or WEBFLOW_API_TOKEN env var");
 }
 
 exports.handler = async (event) => {
-  // 1) Parse incoming body
+  // 1) Parse JSON or x-www-form-urlencoded
   const ct   = (event.headers["content-type"] || "").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
@@ -28,30 +27,19 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "Bot detected." };
   }
 
-  // 4) Block free/disposable domains
+  // 4) Block common free/disposable domains
   if (!domain || blocked.includes(domain)) {
     return { statusCode: 400, body: "Please use your company email." };
   }
 
-  // 5) Ensure the domain has MX records
+  // 5) MX-record lookup
   try {
     await resolveMx(domain);
   } catch {
     return { statusCode: 400, body: "Invalid email domain." };
   }
 
-  // 6) Verify reCAPTCHA v3
-  const token     = data["g-recaptcha-response"];
-  const recaptcha = await fetch(
-    `https://www.google.com/recaptcha/api/siteverify?secret=${RC_SECRET}&response=${token}`,
-    { method: "POST" }
-  ).then(r => r.json());
-
-  if (!recaptcha.success || recaptcha.score < 0.5) {
-    return { statusCode: 400, body: "reCAPTCHA verification failed." };
-  }
-
-  // 7) Forward to Webflow so that Make can pick it up
+  // 6) Forward to Webflow (so Make’s Webflow watcher will see it)
   await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
     method: "POST",
     headers: {
@@ -61,10 +49,10 @@ exports.handler = async (event) => {
     body: JSON.stringify(data)
   });
 
-  // 8) Redirect your user
+  // 7) Redirect to your Thank You page
   return {
     statusCode: 302,
-    headers:    {
+    headers: {
       Location: "https://www.brylliantsolutions.com/free-fix-thank-you"
     }
   };
