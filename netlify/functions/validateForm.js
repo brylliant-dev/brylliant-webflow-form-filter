@@ -7,24 +7,26 @@ const { resolveMx } = require("dns").promises;
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;
 const WEBHOOK_URL      = process.env.MAKE_WEBHOOK_URL;
 
-// Fail fast if you forgot to set them
+// Fail hard if one of these is missing
 if (!RECAPTCHA_SECRET || !WEBHOOK_URL) {
-  throw new Error("Missing RECAPTCHA_SECRET_KEY or MAKE_WEBHOOK_URL env var");
+  throw new Error(
+    "Missing one of RECAPTCHA_SECRET_KEY or MAKE_WEBHOOK_URL in your env vars"
+  );
 }
 
 exports.handler = async (event) => {
-  // 1) Parse the body (JSON or form-encoded)
-  const ct = (event.headers["content-type"] || "").toLowerCase();
+  // 1) Parse JSON or form-encoded body
+  const ct   = (event.headers["content-type"] || "").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
-  // 2) Normalize email
+  // 2) Grab the email (either key), trim & lowercase for checks
   const rawEmail = (data.email ?? data.Email ?? "").trim();
   const email    = rawEmail.toLowerCase();
   const domain   = email.split("@")[1] || "";
 
-  // 3) Honeypot
+  // 3) Honeypot: reject bots
   if (data.hp_name) {
     return { statusCode: 400, body: "Bot detected." };
   }
@@ -34,7 +36,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "Please use your company email." };
   }
 
-  // 5) MX lookup to ensure real mail server
+  // 5) MX lookup to ensure the domain can receive mail
   try {
     await resolveMx(domain);
   } catch {
@@ -42,7 +44,7 @@ exports.handler = async (event) => {
   }
 
   // 6) Verify reCAPTCHA v3
-  const token = data["g-recaptcha-response"];
+  const token     = data["g-recaptcha-response"];
   const recaptcha = await fetch(
     `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET}&response=${token}`,
     { method: "POST" }
@@ -52,7 +54,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "reCAPTCHA verification failed." };
   }
 
-  // 7) Fire your Make webhook
+  // 7) Fire your Make webhook with all form fields
   await fetch(WEBHOOK_URL, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,9 +68,11 @@ exports.handler = async (event) => {
     })
   });
 
-  // 8) Redirect to your custom thank-you page
+  // 8) Redirect to your public Thank You page
   return {
     statusCode: 302,
-    headers:    { Location: "https://www.brylliantsolutions.com/free-fix-thank-you" }
+    headers:    {
+      Location: "https://www.brylliantsolutions.com/free-fix-thank-you"
+    }
   };
 };
