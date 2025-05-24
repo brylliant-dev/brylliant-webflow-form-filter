@@ -5,5 +5,6 @@ module.exports = [
     "hotmail.com",
     "outlook.com",
     "vtext.com",
+    "registry.godaddy",
     "registry.godaddy.com"
   ];  
