@@ -69,6 +69,6 @@ exports.handler = async (event) => {
   // 8) Redirect to your custom thank-you page
   return {
     statusCode: 302,
-    headers:    { Location: "/free-fix-thank-you" }
+    headers:    { Location: "https://www.brylliantsolutions.com/free-fix-thank-you" }
   };
 };
