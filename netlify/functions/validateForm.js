@@ -1,42 +1,39 @@
 // netlify/functions/validateForm.js
 
-const blocked      = require("./blocked-domains");
+const blocked       = require("./blocked-domains");
 const { resolveMx } = require("dns").promises;
 
-// Pull in your secrets
-const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;
-const WEBHOOK_URL      = process.env.MAKE_WEBHOOK_URL;
+const FORM_ID    = process.env.WEBFLOW_FORM_ID;
+const API_TOKEN  = process.env.WEBFLOW_API_TOKEN;
+const RC_SECRET  = process.env.RECAPTCHA_SECRET_KEY;
 
-// Fail hard if one of these is missing
-if (!RECAPTCHA_SECRET || !WEBHOOK_URL) {
-  throw new Error(
-    "Missing one of RECAPTCHA_SECRET_KEY or MAKE_WEBHOOK_URL in your env vars"
-  );
+if (!FORM_ID || !API_TOKEN || !RC_SECRET) {
+  throw new Error("Missing one of WEBFLOW_FORM_ID, WEBFLOW_API_TOKEN or RECAPTCHA_SECRET_KEY");
 }
 
 exports.handler = async (event) => {
-  // 1) Parse JSON or form-encoded body
+  // 1) Parse incoming body
   const ct   = (event.headers["content-type"] || "").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
-  // 2) Grab the email (either key), trim & lowercase for checks
+  // 2) Normalize email
   const rawEmail = (data.email ?? data.Email ?? "").trim();
   const email    = rawEmail.toLowerCase();
   const domain   = email.split("@")[1] || "";
 
-  // 3) Honeypot: reject bots
+  // 3) Honeypot
   if (data.hp_name) {
     return { statusCode: 400, body: "Bot detected." };
   }
 
-  // 4) Block common free/disposable domains
+  // 4) Block free/disposable domains
   if (!domain || blocked.includes(domain)) {
     return { statusCode: 400, body: "Please use your company email." };
   }
 
-  // 5) MX lookup to ensure the domain can receive mail
+  // 5) Ensure the domain has MX records
   try {
     await resolveMx(domain);
   } catch {
@@ -46,7 +43,7 @@ exports.handler = async (event) => {
   // 6) Verify reCAPTCHA v3
   const token     = data["g-recaptcha-response"];
   const recaptcha = await fetch(
-    `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET}&response=${token}`,
+    `https://www.google.com/recaptcha/api/siteverify?secret=${RC_SECRET}&response=${token}`,
     { method: "POST" }
   ).then(r => r.json());
 
@@ -54,21 +51,17 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "reCAPTCHA verification failed." };
   }
 
-  // 7) Fire your Make webhook with all form fields
-  await fetch(WEBHOOK_URL, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({
-      email:      rawEmail,
-      name:       data.Name,
-      websiteUrl: data["Website-URL"],
-      issue:      data["Site-Issue"],
-      consent:    data["I-agree-to-be-contacted-by-Brylliant-Solutions"],
-      turnstile:  data["cf-turnstile-response"]
-    })
+  // 7) Forward to Webflow so that Make can pick it up
+  await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${API_TOKEN}`
+    },
+    body: JSON.stringify(data)
   });
 
-  // 8) Redirect to your public Thank You page
+  // 8) Redirect your user
   return {
     statusCode: 302,
     headers:    {
