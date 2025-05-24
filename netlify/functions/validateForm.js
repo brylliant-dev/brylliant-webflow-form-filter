@@ -63,5 +63,10 @@ exports.handler = async (event) => {
     body: JSON.stringify(data)
   });
 
-  return { statusCode: 200, body: "OK" };
+  return {
+    statusCode: 302,
+    headers: {
+      Location: "https://www.brylliantsolutions.com/free-fix-thank-you"
+    }
+  };
 };
