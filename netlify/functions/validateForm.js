@@ -1,6 +1,6 @@
 const blocked = require("./blocked-domains");
 const dns     = require("dns").promises;
-const fetch   = require("node-fetch");
+//const fetch   = require("node-fetch");
 
 const FORM_ID    = process.env.WEBFLOW_FORM_ID;
 const API_TOKEN  = process.env.WEBFLOW_API_TOKEN;
