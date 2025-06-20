@@ -7,4 +7,4 @@ module.exports = [
     "vtext.com",
     "registry.godaddy",
     "registry.godaddy.com"
-  ];  
+  ];

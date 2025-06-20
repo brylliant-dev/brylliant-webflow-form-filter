@@ -6,6 +6,9 @@
     "deploy": "netlify deploy --prod"
   },
   "devDependencies": {
-    "netlify-cli": "^12.0.0"
+    "netlify-cli": "^21.6.0"
+  },
+  "dependencies": {
+    "tldts": "^7.0.9"
   }
 }

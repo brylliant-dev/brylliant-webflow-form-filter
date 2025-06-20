@@ -11,23 +11,27 @@ if (!FORM_ID || !API_TOKEN) {
 }
 
 exports.handler = async (event) => {
-  // parse JSON or form-encoded
+  // parse JSON or form-encodedn
   const ct = (event.headers["content-type"]||"").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body||"{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
+  const { parse } = require("tldts");  
   // normalize email
   const rawEmail = (data.email ?? data.Email ?? "").trim();
   const email    = rawEmail.toLowerCase();
+
   const domain   = email.split("@")[1] || "";
+  const rootDomain = parse(domain).domain || "";
 
   // 1) honeypot
   if (data.hp_name) return { statusCode:400, body:"Bot detected." };
 
   // 2) blocklist
-  if (!domain || blocked.includes(domain)) {
-    return { statusCode:400, body:"Please use your company email." };
+  if (!rootDomain || blocked.includes(rootDomain)) {
+    console.warn(`Blocked domain attempt: ${email} → ${rootDomain}`);
+    return { statusCode: 400, body: "Please use your company email." };
   }
 
   // 3) MX check
