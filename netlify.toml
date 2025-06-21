@@ -6,5 +6,5 @@
   functions = "netlify/functions"
 
 [[edge_functions]]
-path = "/edge-test"
+path = "/.netlify/functions/validateForm"
 function = "rate-limit"
