@@ -9,6 +9,8 @@
     "netlify-cli": "^21.6.0"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.0.1",
+    "disposable-email-domains": "^1.0.62",
     "tldts": "^7.0.9"
   }
 }

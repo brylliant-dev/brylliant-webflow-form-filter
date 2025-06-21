@@ -17,6 +17,7 @@ exports.handler = async (event) => {
     ? JSON.parse(event.body||"{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
+  const disposableDomains = require("disposable-email-domains");  
   const { parse } = require("tldts");  
   // normalize email
   const rawEmail = (data.email ?? data.Email ?? "").trim();
@@ -29,7 +30,7 @@ exports.handler = async (event) => {
   if (data.hp_name) return { statusCode:400, body:"Bot detected." };
 
   // 2) blocklist
-  if (!rootDomain || blocked.includes(rootDomain)) {
+  if (!rootDomain || blocked.includes(rootDomain) || disposableDomains.includes(rootDomain)) {
     console.warn(`Blocked domain attempt: ${email} → ${rootDomain}`);
     return { statusCode: 400, body: "Please use your company email." };
   }
