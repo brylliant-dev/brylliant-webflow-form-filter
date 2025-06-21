@@ -5,7 +5,8 @@ export default async (request) => {
   const store = getStore('rate-limiter');
   const key = `rate:${ip}`;
 
-  const current = parseInt((await store.get(key)) || '0');
+  const currentRaw = await store.get(key);
+  const current = parseInt(currentRaw || '0');
 
   if (current >= 5) {
     return new Response("Too many requests from this IP. Try again in 5 minutes.", {
@@ -14,9 +15,12 @@ export default async (request) => {
     });
   }
 
-  await store.delete(key);
-  await store.set(key, String(current + 1), { expirationTtl: 300 });
-
+  // Only set TTL when the key is new
+  if (!currentRaw) {
+    await store.set(key, '1', { expirationTtl: 300 });
+  } else {
+    await store.set(key, String(current + 1)); // No TTL = use original expiry
+  }
 
   return new Response("Allowed", {
     status: 200,
