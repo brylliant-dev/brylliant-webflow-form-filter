@@ -14,7 +14,9 @@ export default async (request) => {
     });
   }
 
-  await store.set(key, String(current + 1), { expirationTtl: 300 }); // TTL = 5 minutes
+  await store.delete(key);
+  await store.set(key, String(current + 1), { expirationTtl: 300 });
+
 
   return new Response("Allowed", {
     status: 200,
