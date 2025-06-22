@@ -24,15 +24,15 @@ exports.handler = async (event) => {
     };
   }
 
-  // parse body (JSON or form-encoded)
+  // parse JSON or form data
   const ct = (event.headers["content-type"] || "").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
-  const rawEmail  = (data.email || data.Email || "").trim();
-  const email     = rawEmail.toLowerCase();
-  const domain    = email.split("@")[1] || "";
+  const rawEmail   = (data.email || data.Email || "").trim();
+  const email      = rawEmail.toLowerCase();
+  const domain     = email.split("@")[1] || "";
   const rootDomain = parse(domain).domain || "";
 
   // 1) honeypot
@@ -46,7 +46,7 @@ exports.handler = async (event) => {
     blocked.includes(rootDomain) ||
     disposableDomains.includes(rootDomain)
   ) {
-    console.warn(`Blocked domain: ${email} → ${rootDomain}`);
+    console.warn(`Blocked domain attempt: ${email} → ${rootDomain}`);
     return cors(400, "Please use your company email.");
   }
 
@@ -57,21 +57,35 @@ exports.handler = async (event) => {
     return cors(400, "Invalid email domain.");
   }
 
-  // 4) forward to Webflow
-  await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${API_TOKEN}`,
-    },
-    body: JSON.stringify(data),
-  });
+  // 4) forward to Webflow’s API
+  try {
+    const wfRes = await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
+      method: "POST",
+      headers: {
+        "Content-Type":   "application/json",
+        "Authorization":   `Bearer ${API_TOKEN}`,
+        "accept-version":  "1.0.0",               // ← required header :contentReference[oaicite:0]{index=0}
+      },
+      body: JSON.stringify(data),
+    });
 
-  // 5) success
+    const text = await wfRes.text();
+    console.log("Webflow API response:", wfRes.status, text);
+
+    if (!wfRes.ok) {
+      // return the Webflow error back to the client
+      return cors(wfRes.status, `Webflow error: ${text}`);
+    }
+  } catch (err) {
+    console.error("Error forwarding to Webflow API:", err);
+    return cors(500, "Server error. Please try again.");
+  }
+
+  // 5) all good
   return cors(200, "OK");
 };
 
-// helper to add CORS header
+// helper to add CORS + plain-text body
 function cors(statusCode, body) {
   return {
     statusCode,
