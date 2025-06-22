@@ -5,9 +5,9 @@ const disposableDomains = require("disposable-email-domains");
 const { parse }         = require("tldts");
 const { resolveMx }     = require("dns").promises;
 
-const FORM_ID = process.env.WEBFLOW_FORM_ID;
-if (!FORM_ID) {
-  throw new Error("Missing WEBFLOW_FORM_ID");
+const ELEMENT_ID = process.env.WEBFLOW_ELEMENT_ID;
+if (!ELEMENT_ID) {
+  throw new Error("Missing WEBFLOW_ELEMENT_ID");
 }
 
 exports.handler = async (event) => {
@@ -24,7 +24,7 @@ exports.handler = async (event) => {
     };
   }
 
-  // 2) Parse body (JSON or URL-encoded)
+  // 2) Parse incoming data (JSON or URL-encoded)
   const ct   = (event.headers["content-type"] || "").toLowerCase();
   const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
@@ -35,33 +35,30 @@ exports.handler = async (event) => {
     return cors(400, "Bot detected.");
   }
 
-  // 4) Email normalization + domain extraction
+  // 4) Email/domain checks (blocklist + MX)
   const rawEmail   = (data.email || data.Email || "").trim();
   const email      = rawEmail.toLowerCase();
   const domain     = email.split("@")[1] || "";
   const rootDomain = parse(domain).domain || "";
 
-  // 5) Blocklist & disposable check
   if (
     !rootDomain ||
-    blocked.includes(rootDomain) ||
-    disposableDomains.includes(rootDomain)
+    require("./blocked-domains").includes(rootDomain) ||
+    require("disposable-email-domains").includes(rootDomain)
   ) {
-    console.warn(`Blocked domain: ${email} → ${rootDomain}`);
     return cors(400, "Please use your company email.");
   }
 
-  // 6) MX record check
   try {
     await resolveMx(domain);
   } catch {
     return cors(400, "Invalid email domain.");
   }
 
-  // 7) Forward to your site’s form endpoint
+  // 5) Forward to the published-site form endpoint
   try {
     const siteRes = await fetch(
-      `https://brylliantsolutions.com/form/${FORM_ID}`,
+      `https://www.brylliantsolutions.com/form/${ELEMENT_ID}`,
       {
         method: "POST",
         headers: {
@@ -71,20 +68,19 @@ exports.handler = async (event) => {
       }
     );
     if (!siteRes.ok) {
-      const text = await siteRes.text();
-      console.error("Site form error:", siteRes.status, text);
-      return cors(siteRes.status, `Submission error: ${text}`);
+      const html = await siteRes.text();
+      console.error("Form post failed:", siteRes.status, html);
+      return cors(siteRes.status, "Submission error.");
     }
   } catch (err) {
-    console.error("Error forwarding to site form:", err);
+    console.error("Error posting to site form:", err);
     return cors(500, "Server error. Please try again.");
   }
 
-  // 8) Success
+  // 6) Success
   return cors(200, "OK");
 };
 
-// Helper to return a plain-text CORS response
 function cors(statusCode, message) {
   return {
     statusCode,
