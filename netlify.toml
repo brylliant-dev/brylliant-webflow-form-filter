@@ -13,4 +13,4 @@ function = "rate-limit"
   from     = "/form-filter"
   to       = "/.netlify/functions/validateForm"
   status   = 200
-  methods  = ["POST", "OPTIONS"]
+  methods  = ["GET","POST","OPTIONS"]
