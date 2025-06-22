@@ -5,11 +5,9 @@ const disposableDomains = require("disposable-email-domains");
 const { parse }         = require("tldts");
 const { resolveMx }     = require("dns").promises;
 
-const FORM_ID   = process.env.WEBFLOW_FORM_ID;
-const API_TOKEN = process.env.WEBFLOW_API_TOKEN;
-
-if (!FORM_ID || !API_TOKEN) {
-  throw new Error("Missing WEBFLOW_FORM_ID or WEBFLOW_API_TOKEN");
+const FORM_ID = process.env.WEBFLOW_FORM_ID;
+if (!FORM_ID) {
+  throw new Error("Missing WEBFLOW_FORM_ID");
 }
 
 exports.handler = async (event) => {
@@ -26,9 +24,9 @@ exports.handler = async (event) => {
     };
   }
 
-  // 2) Parse incoming data
-  const contentType = (event.headers["content-type"] || "").toLowerCase();
-  const data = contentType.includes("application/json")
+  // 2) Parse body (JSON or URL-encoded)
+  const ct   = (event.headers["content-type"] || "").toLowerCase();
+  const data = ct.includes("application/json")
     ? JSON.parse(event.body || "{}")
     : Object.fromEntries(new URLSearchParams(event.body));
 
@@ -49,7 +47,7 @@ exports.handler = async (event) => {
     blocked.includes(rootDomain) ||
     disposableDomains.includes(rootDomain)
   ) {
-    console.warn(`Blocked domain attempt: ${email} → ${rootDomain}`);
+    console.warn(`Blocked domain: ${email} → ${rootDomain}`);
     return cors(400, "Please use your company email.");
   }
 
@@ -60,28 +58,25 @@ exports.handler = async (event) => {
     return cors(400, "Invalid email domain.");
   }
 
-  // 7) Forward to Webflow v1 submissions endpoint
+  // 7) Forward to your site’s form endpoint
   try {
-    // ✅ send URL-encoded exactly as a browser form would
-    const wfRes = await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
-      method: "POST",
-      headers: {
-        "Content-Type":   "application/x-www-form-urlencoded",
-        "Accept-Version": "1.0.0"
-      },
-      // translate your parsed `data` back into an urlencoded string
-      body: new URLSearchParams(data).toString()
-    });
-
-
-    const text = await wfRes.text();
-    console.log("Webflow API v1 response:", wfRes.status, text);
-
-    if (!wfRes.ok) {
-      return cors(wfRes.status, `Webflow error: ${text}`);
+    const siteRes = await fetch(
+      `https://brylliantsolutions.com/form/${FORM_ID}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(data).toString(),
+      }
+    );
+    if (!siteRes.ok) {
+      const text = await siteRes.text();
+      console.error("Site form error:", siteRes.status, text);
+      return cors(siteRes.status, `Submission error: ${text}`);
     }
   } catch (err) {
-    console.error("Error forwarding to Webflow API:", err);
+    console.error("Error forwarding to site form:", err);
     return cors(500, "Server error. Please try again.");
   }
 
@@ -90,7 +85,7 @@ exports.handler = async (event) => {
 };
 
 // Helper to return a plain-text CORS response
-function cors(statusCode, body) {
+function cors(statusCode, message) {
   return {
     statusCode,
     headers: {
@@ -99,6 +94,6 @@ function cors(statusCode, body) {
       "Access-Control-Allow-Headers": "Content-Type",
       "Content-Type":                 "text/plain",
     },
-    body,
+    body: message,
   };
 }
