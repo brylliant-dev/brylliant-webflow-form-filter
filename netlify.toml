@@ -1,10 +1,17 @@
 [build]
-  functions = "netlify/functions"
-  publish   = "public"
+  functions      = "netlify/functions"
+  edge_functions = "netlify/edge-functions"
+  publish        = "public"
 
 [dev]
   functions = "netlify/functions"
 
 [[edge_functions]]
-path = "/form-filter"
-function = "rate-limit"
+  path     = "/form-filter"
+  function = "rate-limit"
+
+[[redirects]]
+  from     = "/form-filter"
+  to       = "/.netlify/functions/validateForm"
+  status   = 200
+  methods  = ["POST", "OPTIONS"]
