@@ -62,16 +62,17 @@ exports.handler = async (event) => {
 
   // 7) Forward to Webflow v1 submissions endpoint
   try {
+    // ✅ send URL-encoded exactly as a browser form would
     const wfRes = await fetch(`https://api.webflow.com/form/${FORM_ID}`, {
       method: "POST",
       headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${API_TOKEN}`,
-        // this header is required even on the v1 endpoint
-        "accept-version": "1.0.0",
+        "Content-Type":   "application/x-www-form-urlencoded",
+        "Accept-Version": "1.0.0"
       },
-      body: JSON.stringify(data),
+      // translate your parsed `data` back into an urlencoded string
+      body: new URLSearchParams(data).toString()
     });
+
 
     const text = await wfRes.text();
     console.log("Webflow API v1 response:", wfRes.status, text);
