@@ -8,3 +8,9 @@
 [[edge_functions]]
 path = "/form-filter"
 function = "rate-limit"
+
+[[redirects]]
+  from     = "/form-filter"
+  to       = "/.netlify/functions/validateForm"
+  status   = 200
+  methods  = ["POST", "OPTIONS"]
